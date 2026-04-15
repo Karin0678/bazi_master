@@ -155,9 +155,11 @@ uv run pytest tests/ -v
 
 ---
 
-## 部署到 Railway
+## 线上部署
 
-项目已包含 `railway.toml`，直接连接 GitHub 仓库即可一键部署。在 Railway 控制台添加环境变量（同 `.env` 内容）后自动启动。
+项目支持部署到 [Railway](https://railway.app) 平台，部署后可通过公网 URL 让任何人直接访问。
+
+详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
 ---
 
