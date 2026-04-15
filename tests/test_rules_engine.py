@@ -2,13 +2,14 @@
 规则引擎测试
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from bazi_master.core.bazi_calc import calculate_bazi
-from bazi_master.core.wuxing import analyze_wuxing_strength
 from bazi_master.core.dayun import calculate_dayun
+from bazi_master.core.wuxing import analyze_wuxing_strength
 from bazi_master.services.rules_engine import generate_rules_analysis
 
 

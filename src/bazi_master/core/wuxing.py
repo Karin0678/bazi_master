@@ -2,10 +2,7 @@
 五行旺衰分析与喜用神推断
 """
 
-from .constants import (
-    TIANGAN_WUXING, DIZHI_WUXING, DIZHI_CANGGAN,
-    WUXING_SHENG, WUXING_KE, get_wuxing_state
-)
+from .constants import DIZHI_CANGGAN, TIANGAN_WUXING, WUXING_KE, WUXING_SHENG, get_wuxing_state
 
 
 def analyze_wuxing_strength(bazi_data: dict) -> dict:
@@ -15,7 +12,7 @@ def analyze_wuxing_strength(bazi_data: dict) -> dict:
     """
     pillars = bazi_data["pillars"]
     month_zhi = bazi_data["month_zhi"]
-    day_tg = bazi_data["day_master"]["tg"]
+    bazi_data["day_master"]["tg"]
     day_wx = bazi_data["day_master"]["wuxing"]
 
     # 计算各五行得分
@@ -110,8 +107,8 @@ def determine_xiyong(day_wx: str, strength_level: str, scores: dict) -> dict:
     """
     # 找出最强和最弱的五行
     sorted_wx = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    strongest = sorted_wx[0][0]
-    weakest = sorted_wx[-1][0]
+    sorted_wx[0][0]
+    sorted_wx[-1][0]
 
     if strength_level == "强":
         # 身强：用神为克我、泄我之物

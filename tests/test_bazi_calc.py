@@ -3,14 +3,12 @@
 验证已知生日的八字结果
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from bazi_master.core.bazi_calc import calculate_bazi
-from bazi_master.core.constants import (
-    TIANGAN_WUXING, DIZHI_WUXING, TIANGAN_YINYANG
-)
 
 
 class TestBaziCalculation:

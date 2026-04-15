@@ -3,11 +3,7 @@
 基于规则字典提供八字分析文字
 """
 
-from ..core.constants import (
-    TIANGAN_WUXING, DIZHI_WUXING, TIANGAN_YINYANG,
-    WUXING_SHENG, WUXING_KE, get_shishen
-)
-
+from ..core.constants import DIZHI_WUXING, TIANGAN_WUXING, TIANGAN_YINYANG
 
 # 日主五行性格特征
 DAY_MASTER_TRAITS = {
@@ -167,7 +163,7 @@ def _gen_overview(bazi_data, wuxing_analysis, day_tg, day_wx, day_yy, gender, st
 
 def _gen_personality(day_tg, day_wx, gender, strength, xiyong) -> str:
     traits = DAY_MASTER_TRAITS.get(day_tg, {})
-    xiyong_list = xiyong["xiyong"]
+    xiyong["xiyong"]
 
     text = f"""【性格与天赋分析】
 
@@ -234,7 +230,6 @@ def _gen_dayun(dayun_data, bazi_data, wuxing_analysis) -> str:
     xiyong_list = wuxing_analysis["xiyong"]["xiyong"]
     jishen_list = wuxing_analysis["xiyong"]["jishen"]
 
-    from ..core.constants import TIANGAN_WUXING, DIZHI_WUXING
 
     dayun_descriptions = []
     for d in dayuns[:5]:  # 只展示前5个大运

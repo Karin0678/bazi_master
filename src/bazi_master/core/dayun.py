@@ -3,9 +3,10 @@
 3天=1年算法，精确到月
 """
 
-from datetime import datetime, timedelta
-from .constants import TIANGAN, DIZHI, TIANGAN_YINYANG
-from .solar_terms import get_jieqi_for_dayun, JIEQI_TO_MONTH
+from datetime import datetime
+
+from .constants import DIZHI, TIANGAN, TIANGAN_YINYANG
+from .solar_terms import get_jieqi_for_dayun
 
 
 def calculate_dayun(bazi_data: dict) -> dict:
@@ -17,7 +18,7 @@ def calculate_dayun(bazi_data: dict) -> dict:
     """
     birth = bazi_data["birth"]
     gender = bazi_data["gender"]
-    day_tg = bazi_data["day_master"]["tg"]
+    bazi_data["day_master"]["tg"]
     year_tg = bazi_data["pillars"]["year"]["tg"]
 
     year_yinyang = TIANGAN_YINYANG[year_tg]
@@ -63,7 +64,7 @@ def calculate_dayun(bazi_data: dict) -> dict:
 
     # 3天=1年，1天=4个月
     years_to_dayun = days_diff / 3
-    months_offset = int(years_to_dayun * 12)
+    int(years_to_dayun * 12)
     start_years = int(years_to_dayun)
     start_months = int((years_to_dayun - start_years) * 12)
 

@@ -5,7 +5,8 @@ AI 流式调用封装
 """
 
 from typing import AsyncIterator
-from ..config import AI_PROVIDER, AI_API_KEY, AI_BASE_URL, AI_MODEL
+
+from ..config import AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_PROVIDER
 
 
 def build_bazi_context(bazi_data: dict, wuxing_analysis: dict, dayun_data: dict) -> str:

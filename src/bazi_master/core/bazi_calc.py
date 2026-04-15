@@ -4,10 +4,17 @@
 """
 
 from datetime import datetime, timedelta
+
 from .constants import (
-    TIANGAN, DIZHI, TIANGAN_WUXING, DIZHI_WUXING,
-    TIANGAN_YINYANG, DIZHI_YINYANG, DIZHI_CANGGAN,
-    NAYIN, get_shishen, hour_to_dizhi, WUXING_SHENG, WUXING_KE
+    DIZHI,
+    DIZHI_CANGGAN,
+    DIZHI_WUXING,
+    NAYIN,
+    TIANGAN,
+    TIANGAN_WUXING,
+    TIANGAN_YINYANG,
+    get_shishen,
+    hour_to_dizhi,
 )
 from .solar_terms import get_month_jieqi
 

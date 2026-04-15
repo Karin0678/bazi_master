@@ -2,11 +2,12 @@
 统一分析入口，路由到规则引擎或 Claude
 """
 
-from .rules_engine import generate_rules_analysis
-from .claude_service import stream_analysis, stream_chat
-from ..core.wuxing import analyze_wuxing_strength
-from ..core.dayun import calculate_dayun
 from typing import AsyncIterator
+
+from ..core.dayun import calculate_dayun
+from ..core.wuxing import analyze_wuxing_strength
+from .claude_service import stream_analysis, stream_chat
+from .rules_engine import generate_rules_analysis
 
 
 def get_full_analysis_data(bazi_data: dict) -> dict:

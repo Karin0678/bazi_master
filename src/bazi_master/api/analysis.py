@@ -4,12 +4,13 @@ POST /api/analysis
 """
 
 import json
+from typing import Literal
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Literal
 
-from ..services.analysis import get_rules_analysis, get_claude_analysis
+from ..services.analysis import get_claude_analysis, get_rules_analysis
 
 router = APIRouter()
 

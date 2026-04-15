@@ -4,14 +4,15 @@ POST /api/chat （SSE 流式）
 """
 
 import json
+from typing import List
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List
 
-from ..services.analysis import get_claude_chat
-from ..core.wuxing import analyze_wuxing_strength
 from ..core.dayun import calculate_dayun
+from ..core.wuxing import analyze_wuxing_strength
+from ..services.analysis import get_claude_chat
 
 router = APIRouter()
 

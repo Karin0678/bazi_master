@@ -1,6 +1,7 @@
 from fastapi import APIRouter
-from .bazi import router as bazi_router
+
 from .analysis import router as analysis_router
+from .bazi import router as bazi_router
 from .chat import router as chat_router
 
 api_router = APIRouter()

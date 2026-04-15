@@ -3,9 +3,10 @@
 POST /api/bazi/calculate
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional
 
 from ..core.bazi_calc import calculate_bazi
 from ..services.analysis import get_full_analysis_data
