@@ -189,7 +189,7 @@ async function loadClaudeAnalysis(section) {
             const parsed = JSON.parse(data);
             if (parsed.text) {
               fullText += parsed.text;
-              textEl.textContent = fullText;
+              textEl.innerHTML = marked.parse(fullText);
             }
             if (parsed.error) {
               showError(parsed.error);
