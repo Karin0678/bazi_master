@@ -7,14 +7,18 @@ let currentData = null;
 let currentSection = 'overview';
 let isClaudeMode = false;
 let streamController = null; // 用于取消进行中的 SSE 流
+let analysisCache = {};       // 分析结果缓存，key 为 section，值为原始文本
 
-// 模式切换
+// ── 模式切换 ─────────────────────────────────────────────────────────────────
+
 document.getElementById('mode-toggle-input').addEventListener('change', function() {
   isClaudeMode = this.checked;
   updateModeLabel();
-  // 如果已有数据，刷新当前分析
   if (currentData) {
+    // 模式切换后缓存失效（规则引擎与 Claude 内容不同）
+    analysisCache = {};
     loadAnalysis(currentSection);
+    document.getElementById('chat-card').style.display = isClaudeMode ? 'block' : 'none';
   }
 });
 
@@ -35,7 +39,8 @@ function updateModeLabel() {
 }
 updateModeLabel();
 
-// Tab 切换
+// ── Tab 切换 ──────────────────────────────────────────────────────────────────
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', function() {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -47,21 +52,21 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// 表单提交
+// ── 表单提交（起卦）──────────────────────────────────────────────────────────
+
 document.getElementById('birth-form').addEventListener('submit', async function(e) {
   e.preventDefault();
   await calculateBazi();
 });
 
 async function calculateBazi() {
-  const year = parseInt(document.getElementById('birth-year').value);
-  const month = parseInt(document.getElementById('birth-month').value);
-  const day = parseInt(document.getElementById('birth-day').value);
-  const hour = parseInt(document.getElementById('birth-hour').value);
+  const year   = parseInt(document.getElementById('birth-year').value);
+  const month  = parseInt(document.getElementById('birth-month').value);
+  const day    = parseInt(document.getElementById('birth-day').value);
+  const hour   = parseInt(document.getElementById('birth-hour').value);
   const minute = parseInt(document.getElementById('birth-minute').value) || 0;
   const gender = document.getElementById('birth-gender').value;
 
-  // 显示加载状态
   showLoading();
 
   try {
@@ -75,21 +80,19 @@ async function calculateBazi() {
 
     if (result.success) {
       currentData = result.data;
+      // 新起卦时清空缓存
+      analysisCache = {};
 
-      // 渲染四柱
       renderPillars(currentData);
-      // 渲染五行
       renderWuxing(currentData);
-      // 渲染大运
       renderDayun(currentData);
-      // 初始化对话（只在 Claude 模式下显示）
+
       if (isClaudeMode) {
         initChat(currentData);
       } else {
         document.getElementById('chat-card').style.display = 'none';
       }
 
-      // 加载分析文本
       await loadAnalysis(currentSection);
     } else {
       showError('计算失败：' + (result.detail || '未知错误'));
@@ -99,19 +102,37 @@ async function calculateBazi() {
   }
 }
 
+// ── 分析加载（带缓存）────────────────────────────────────────────────────────
+
 async function loadAnalysis(section) {
   if (!currentData) return;
+
+  // 命中缓存：直接展示，不发请求
+  if (analysisCache[section] !== undefined) {
+    showCachedAnalysis(analysisCache[section]);
+    return;
+  }
 
   showLoading();
 
   if (isClaudeMode) {
-    // Claude 流式模式
     initChat(currentData);
     await loadClaudeAnalysis(section);
   } else {
-    // 规则引擎模式
     await loadRulesAnalysis(section);
   }
+}
+
+function showCachedAnalysis(text) {
+  document.getElementById('analysis-placeholder').style.display = 'none';
+  document.getElementById('analysis-loading').style.display = 'none';
+  const textEl = document.getElementById('analysis-text');
+  if (isClaudeMode) {
+    textEl.innerHTML = marked.parse(text);
+  } else {
+    textEl.textContent = text;
+  }
+  textEl.style.display = 'block';
 }
 
 async function loadRulesAnalysis(section) {
@@ -130,6 +151,7 @@ async function loadRulesAnalysis(section) {
 
     const result = await response.json();
     if (result.success) {
+      analysisCache[section] = result.text; // 写入缓存
       showAnalysisText(result.text);
     } else {
       showError('分析失败');
@@ -147,7 +169,7 @@ async function loadClaudeAnalysis(section) {
   streamController = new AbortController();
   const signal = streamController.signal;
 
-  showAnalysisText('', true); // 流式模式，先清空
+  showAnalysisText('', true); // 先清空，准备流式填充
   const textEl = document.getElementById('analysis-text');
   textEl.classList.add('typing-cursor');
 
@@ -183,6 +205,7 @@ async function loadClaudeAnalysis(section) {
           const data = line.slice(6);
           if (data === '[DONE]') {
             textEl.classList.remove('typing-cursor');
+            analysisCache[section] = fullText; // 流结束后写入缓存
             break;
           }
           try {
@@ -207,6 +230,8 @@ async function loadClaudeAnalysis(section) {
   }
 }
 
+// ── UI 工具函数 ───────────────────────────────────────────────────────────────
+
 function showLoading() {
   document.getElementById('analysis-placeholder').style.display = 'none';
   document.getElementById('analysis-text').style.display = 'none';
@@ -219,7 +244,9 @@ function showAnalysisText(text, streaming = false) {
   const textEl = document.getElementById('analysis-text');
   textEl.textContent = text;
   textEl.style.display = 'block';
-  textEl.classList.add('fade-in');
+  if (!streaming) {
+    textEl.classList.add('fade-in');
+  }
 }
 
 function showError(msg) {
@@ -230,14 +257,3 @@ function showError(msg) {
   textEl.style.display = 'block';
   textEl.style.color = 'var(--red-accent)';
 }
-
-// 监听 Claude 模式下显示对话框
-document.getElementById('mode-toggle-input').addEventListener('change', function() {
-  if (currentData) {
-    if (isClaudeMode) {
-      document.getElementById('chat-card').style.display = 'block';
-    } else {
-      document.getElementById('chat-card').style.display = 'none';
-    }
-  }
-});
