@@ -8,16 +8,21 @@ let currentSection = 'overview';
 let isClaudeMode = false;
 
 // 分析状态
-let analysisCache = {};   // { section: fullText } 已完成的分析
-let sectionTexts = {};    // { section: partialText } 进行中的流式文本
-let pendingStreams = {};   // { section: AbortController } 进行中的流
+// 规则引擎与 Claude 各自独立缓存，模式切换不清缓存
+let analysisCache = { rules: {}, claude: {} };
+let sectionTexts = {};    // { section: partialText } Claude 进行中的流式文本
+let pendingStreams = {};   // { section: AbortController } Claude 进行中的流
 
-// ── 状态重置（起卦 / 模式切换时调用）────────────────────────────────────────
+function getCache() {
+  return isClaudeMode ? analysisCache.claude : analysisCache.rules;
+}
+
+// ── 状态重置（仅起卦时调用）──────────────────────────────────────────────────
 
 function resetAnalysisState() {
   Object.values(pendingStreams).forEach(c => c.abort());
   pendingStreams = {};
-  analysisCache = {};
+  analysisCache = { rules: {}, claude: {} };
   sectionTexts = {};
 }
 
@@ -27,7 +32,7 @@ document.getElementById('mode-toggle-input').addEventListener('change', function
   isClaudeMode = this.checked;
   updateModeLabel();
   if (currentData) {
-    resetAnalysisState();
+    // 不清缓存：切回同一模式时直接复用已有结果
     loadAnalysis(currentSection);
     document.getElementById('chat-card').style.display = isClaudeMode ? 'block' : 'none';
   }
@@ -116,8 +121,8 @@ function loadAnalysis(section) {
   if (!currentData) return;
 
   // 1. 已完成：直接从缓存渲染
-  if (analysisCache[section] !== undefined) {
-    renderContent(section, analysisCache[section], false);
+  if (getCache()[section] !== undefined) {
+    renderContent(section, getCache()[section], false);
     return;
   }
 
@@ -161,7 +166,7 @@ async function loadRulesAnalysis(section) {
 
     const result = await response.json();
     if (result.success) {
-      analysisCache[section] = result.text;
+      analysisCache.rules[section] = result.text;
       if (currentSection === section) renderContent(section, result.text, false);
     } else {
       if (currentSection === section) showError('分析失败');
@@ -223,7 +228,7 @@ async function loadClaudeAnalysis(section) {
 
         if (data === '[DONE]') {
           // 流结束：写入缓存，更新 DOM（如果用户当前在此 Tab）
-          analysisCache[section] = fullText;
+          analysisCache.claude[section] = fullText;
           delete pendingStreams[section];
           delete sectionTexts[section];
           if (currentSection === section) {
