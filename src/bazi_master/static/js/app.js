@@ -6,6 +6,7 @@
 let currentData = null;
 let currentSection = 'overview';
 let isClaudeMode = false;
+let streamController = null; // 用于取消进行中的 SSE 流
 
 // 模式切换
 document.getElementById('mode-toggle-input').addEventListener('change', function() {
@@ -139,6 +140,13 @@ async function loadRulesAnalysis(section) {
 }
 
 async function loadClaudeAnalysis(section) {
+  // 取消上一个正在进行的流式请求
+  if (streamController) {
+    streamController.abort();
+  }
+  streamController = new AbortController();
+  const signal = streamController.signal;
+
   showAnalysisText('', true); // 流式模式，先清空
   const textEl = document.getElementById('analysis-text');
   textEl.classList.add('typing-cursor');
@@ -153,7 +161,8 @@ async function loadClaudeAnalysis(section) {
         dayun_data: currentData.dayun,
         mode: 'claude',
         section: section
-      })
+      }),
+      signal
     });
 
     const reader = response.body.getReader();
@@ -191,7 +200,10 @@ async function loadClaudeAnalysis(section) {
     }
   } catch (err) {
     textEl.classList.remove('typing-cursor');
-    showError('流式传输错误：' + err.message);
+    // AbortError 是主动取消，不属于错误，静默处理
+    if (err.name !== 'AbortError') {
+      showError('流式传输错误：' + err.message);
+    }
   }
 }
 
