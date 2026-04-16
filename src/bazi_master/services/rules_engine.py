@@ -4,6 +4,8 @@
 """
 
 from ..core.constants import DIZHI_WUXING, TIANGAN_WUXING, TIANGAN_YINYANG
+from ..core.today_calc import get_current_dayun, get_today_pillars
+from ..core.wuxing import rate_element, rate_pillar
 
 # 日主五行性格特征
 DAY_MASTER_TRAITS = {
@@ -97,7 +99,7 @@ MINGGE_INTERPRETATIONS = {
 def generate_rules_analysis(bazi_data: dict, wuxing_analysis: dict, dayun_data: dict, section: str = "overview") -> str:
     """
     使用规则引擎生成八字分析文字
-    section: overview（命格总论）/ personality（性格天赋）/ career（事业财运）/ dayun（大运流年）
+    section: overview（命格总论）/ personality（性格天赋）/ career（事业财运）/ dayun（大运流年）/ today（今日运势）
     """
     pillars = bazi_data["pillars"]
     day_tg = bazi_data["day_master"]["tg"]
@@ -120,6 +122,8 @@ def generate_rules_analysis(bazi_data: dict, wuxing_analysis: dict, dayun_data: 
         return _gen_career(day_wx, gender, strength, xiyong)
     elif section == "dayun":
         return _gen_dayun(dayun_data, bazi_data, wuxing_analysis)
+    elif section == "today":
+        return _gen_today(bazi_data, wuxing_analysis, dayun_data)
     else:
         return _gen_overview(bazi_data, wuxing_analysis, day_tg, day_wx, day_yy, gender, strength, xiyong, year_gz, month_gz, day_gz, hour_gz)
 
@@ -262,5 +266,100 @@ def _gen_dayun(dayun_data, bazi_data, wuxing_analysis) -> str:
 【注意事项】
 大运流年分析仅供参考，实际命运还受后天努力、环境机遇等多重因素影响。
 命理学的价值在于认识自身优势与不足，借以趋吉避凶，而非宿命论。"""
+
+    return text
+
+
+def _gen_today(bazi_data: dict, wuxing_analysis: dict, dayun_data: dict) -> str:
+    today = get_today_pillars()
+    xiyong_list = wuxing_analysis["xiyong"]["xiyong"]
+    jishen_list = wuxing_analysis["xiyong"]["jishen"]
+
+    d = today["date"]
+    yp = today["year"]
+    mp = today["month"]
+    dp = today["day"]
+
+    year_label  = rate_pillar(yp["tg_wx"], yp["dz_wx"], xiyong_list, jishen_list)
+    month_label = rate_pillar(mp["tg_wx"], mp["dz_wx"], xiyong_list, jishen_list)
+    day_label   = rate_pillar(dp["tg_wx"], dp["dz_wx"], xiyong_list, jishen_list)
+
+    labels = [year_label, month_label, day_label]
+    ji, xiong = labels.count("吉"), labels.count("凶")
+    if ji >= 2:
+        overall = "整体运势偏旺，宜主动出击，把握时机推进重要事务。"
+    elif xiong >= 2:
+        overall = "整体运势偏弱，宜守成为主，暂缓重大决策，以静制动。"
+    else:
+        overall = "运势平稳中正，按部就班、稳中求进即可。"
+
+    def pillar_line(p: dict) -> str:
+        return (
+            f"天干 {p['tg']}（{p['tg_wx']}）{rate_element(p['tg_wx'], xiyong_list, jishen_list)}"
+            f" · 地支 {p['dz']}（{p['dz_wx']}）{rate_element(p['dz_wx'], xiyong_list, jishen_list)}"
+        )
+
+    def year_comment(label: str) -> str:
+        if label == "吉":
+            return "今年流年五行与喜用相合，全年运势较顺，适合推进事业、人际、财务等重要事项。"
+        if label == "凶":
+            return "今年流年五行偏忌，需保持谨慎，避免激进决策，重点稳固基础。"
+        return "今年流年五行中性，运势平稳，按既定计划稳步推进即可。"
+
+    def month_comment(label: str) -> str:
+        if label == "吉":
+            return "本月流月五行有利，可把握月内时机推进重要事务。"
+        if label == "凶":
+            return "本月流月五行偏忌，需注意谨慎行事，避免冲动决策。"
+        return "本月流月五行中性，维持日常节奏，勿轻举妄动。"
+
+    def day_comment(label: str) -> str:
+        if label == "吉":
+            return "今日日柱五行有利，宜推进重要事项、洽谈商务或出行拜访。"
+        if label == "凶":
+            return "今日日柱五行偏忌，宜低调行事，推迟非必要的重要决定。"
+        return "今日日柱五行中性，平常心行事，按计划推进即可。"
+
+    # 当前大运
+    current_dun = get_current_dayun(dayun_data, bazi_data["birth"]["year"])
+    dayun_block = ""
+    if current_dun:
+        dun_tg_wx = TIANGAN_WUXING[current_dun["tg"]]
+        dun_dz_wx = DIZHI_WUXING[current_dun["dz"]]
+        dun_label = rate_pillar(dun_tg_wx, dun_dz_wx, xiyong_list, jishen_list)
+        if dun_label == "吉":
+            dun_comment = "大运五行与喜用相合，此阶段整体运势向好，是拓展发展的重要窗口期。"
+        elif dun_label == "凶":
+            dun_comment = "大运五行偏忌，此阶段宜稳健积累，等待运势转机。"
+        else:
+            dun_comment = "大运五行中性，宜结合流年灵活判断，顺势而为。"
+        dayun_block = (
+            f"\n【当前大运 · {current_dun['gz']}"
+            f"（{current_dun['year_start']}—{current_dun['year_end']}年，"
+            f"{current_dun['age_start']}—{current_dun['age_end']}岁）】\n"
+            f"天干 {current_dun['tg']}（{dun_tg_wx}）{rate_element(dun_tg_wx, xiyong_list, jishen_list)}"
+            f" · 地支 {current_dun['dz']}（{dun_dz_wx}）{rate_element(dun_dz_wx, xiyong_list, jishen_list)}"
+            f" · 综合：{dun_label}\n{dun_comment}\n"
+        )
+
+    text = f"""【今日运势 · {d['year']}年{d['month']}月{d['day']}日】
+{dayun_block}
+【流年运势 · {yp['gz']}（{d['year']}年）】
+{pillar_line(yp)} · 综合：{year_label}
+{year_comment(year_label)}
+
+【流月运势 · {mp['gz']}（{d['year']}年{d['month']}月）】
+{pillar_line(mp)} · 综合：{month_label}
+{month_comment(month_label)}
+
+【流日运势 · {dp['gz']}（今日）】
+{pillar_line(dp)} · 综合：{day_label}
+{day_comment(day_label)}
+
+【综合建议】
+{overall}
+喜用神（{'、'.join(xiyong_list)}）相关的方向、颜色、环境对今日运势有正向加持；忌神（{'、'.join(jishen_list)}）相关事项宜暂缓或保持警惕。
+
+※ 以上为流年流月流日与命局五行生克分析，仅供参考。"""
 
     return text

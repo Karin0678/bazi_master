@@ -7,6 +7,7 @@ AI 流式调用封装
 from typing import AsyncIterator
 
 from ..config import AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_PROVIDER
+from ..core.today_calc import get_current_dayun, get_today_pillars
 
 
 def build_bazi_context(bazi_data: dict, wuxing_analysis: dict, dayun_data: dict) -> str:
@@ -43,17 +44,17 @@ def build_bazi_context(bazi_data: dict, wuxing_analysis: dict, dayun_data: dict)
 
 当前大运："""
 
-    from datetime import datetime
-    current_year = datetime.now().year
-    birth_year = birth["year"]
-    current_age = current_year - birth_year
+    current_dun = get_current_dayun(dayun_data, birth["year"])
+    context += f"{current_dun['gz']}（{current_dun['year_start']}-{current_dun['year_end']}年）" if current_dun else "尚未起运"
 
-    for dayun in dayun_data["dayuns"]:
-        if dayun["age_start"] <= current_age <= dayun["age_end"]:
-            context += f"{dayun['gz']}（{dayun['year_start']}-{dayun['year_end']}年）"
-            break
-    else:
-        context += "尚未起运"
+    today = get_today_pillars()
+    d = today["date"]
+    context += f"""
+
+今日日期：{d['year']}年{d['month']}月{d['day']}日
+流年干支：{today['year']['gz']}（天干{today['year']['tg']}·{today['year']['tg_wx']}，地支{today['year']['dz']}·{today['year']['dz_wx']}）
+流月干支：{today['month']['gz']}（天干{today['month']['tg']}·{today['month']['tg_wx']}，地支{today['month']['dz']}·{today['month']['dz_wx']}）
+流日干支：{today['day']['gz']}（天干{today['day']['tg']}·{today['day']['tg_wx']}，地支{today['day']['dz']}·{today['day']['dz_wx']}）"""
 
     return context
 
@@ -101,6 +102,17 @@ SECTION_PROMPTS = {
 5. 把握运势的实用建议
 
 要求：结合具体大运干支和命局喜用神，给出有价值的人生规划参考，约400-600字。""",
+
+    "today": """请根据以上八字及今日流年、流月、流日信息，为命主解读当日运势。
+
+分析要点：
+1. 今日流年干支与命局的生克关系（今年整体运势基调）
+2. 今日流月干支对本月运势的具体影响
+3. 今日流日干支的当日吉凶指引
+4. 结合当前大运，综合研判今日能量状态
+5. 具体行动建议（适宜做的事 / 需要规避的方向）
+
+要求：语言温和亲切，有实际参考价值，避免消极预测，注重正向引导，约400-500字。""",
 }
 
 SYSTEM_PROMPT = """你是一位精通中国传统命理学的八字命理专家，有三十年研究经验。

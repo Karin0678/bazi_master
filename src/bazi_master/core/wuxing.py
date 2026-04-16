@@ -157,3 +157,31 @@ def determine_xiyong(day_wx: str, strength_level: str, scores: dict) -> dict:
         "jishen": jishen_wx,
         "description": f"日主{'身强' if strength_level == '强' else '身弱'}，喜{'、'.join(xiyong_wx)}，忌{'、'.join(jishen_wx)}"
     }
+
+
+# ── 公共评级工具（供 rules_engine 和 claude_service 复用）────────────────────
+
+def rate_element(wx: str, xiyong_list: list, jishen_list: list) -> str:
+    """判断单一五行对命主的影响：有利 / 中性 / 不利"""
+    if wx in xiyong_list:
+        return "有利"
+    if wx in jishen_list:
+        return "不利"
+    return "中性"
+
+
+def rate_pillar(tg_wx: str, dz_wx: str, xiyong_list: list, jishen_list: list) -> str:
+    """
+    综合天干、地支五行，判断该柱对命主的吉凶影响：吉 / 平 / 凶
+    有利 +1，中性 0，不利 -1，两者之和决定结果
+    """
+    score_map = {"有利": 1, "中性": 0, "不利": -1}
+    score = (
+        score_map[rate_element(tg_wx, xiyong_list, jishen_list)]
+        + score_map[rate_element(dz_wx, xiyong_list, jishen_list)]
+    )
+    if score > 0:
+        return "吉"
+    if score < 0:
+        return "凶"
+    return "平"
