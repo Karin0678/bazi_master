@@ -6,17 +6,28 @@
 let currentData = null;
 let currentSection = 'overview';
 let isClaudeMode = false;
-let streamController = null; // 用于取消进行中的 SSE 流
-let analysisCache = {};       // 分析结果缓存，key 为 section，值为原始文本
 
-// ── 模式切换 ─────────────────────────────────────────────────────────────────
+// 分析状态
+let analysisCache = {};   // { section: fullText } 已完成的分析
+let sectionTexts = {};    // { section: partialText } 进行中的流式文本
+let pendingStreams = {};   // { section: AbortController } 进行中的流
+
+// ── 状态重置（起卦 / 模式切换时调用）────────────────────────────────────────
+
+function resetAnalysisState() {
+  Object.values(pendingStreams).forEach(c => c.abort());
+  pendingStreams = {};
+  analysisCache = {};
+  sectionTexts = {};
+}
+
+// ── 模式切换 ──────────────────────────────────────────────────────────────────
 
 document.getElementById('mode-toggle-input').addEventListener('change', function() {
   isClaudeMode = this.checked;
   updateModeLabel();
   if (currentData) {
-    // 模式切换后缓存失效（规则引擎与 Claude 内容不同）
-    analysisCache = {};
+    resetAnalysisState();
     loadAnalysis(currentSection);
     document.getElementById('chat-card').style.display = isClaudeMode ? 'block' : 'none';
   }
@@ -46,9 +57,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
     currentSection = this.dataset.section;
-    if (currentData) {
-      loadAnalysis(currentSection);
-    }
+    if (currentData) loadAnalysis(currentSection);
   });
 });
 
@@ -80,8 +89,7 @@ async function calculateBazi() {
 
     if (result.success) {
       currentData = result.data;
-      // 新起卦时清空缓存
-      analysisCache = {};
+      resetAnalysisState(); // 新起卦，清空所有缓存和流
 
       renderPillars(currentData);
       renderWuxing(currentData);
@@ -93,7 +101,7 @@ async function calculateBazi() {
         document.getElementById('chat-card').style.display = 'none';
       }
 
-      await loadAnalysis(currentSection);
+      loadAnalysis(currentSection);
     } else {
       showError('计算失败：' + (result.detail || '未知错误'));
     }
@@ -102,38 +110,40 @@ async function calculateBazi() {
   }
 }
 
-// ── 分析加载（带缓存）────────────────────────────────────────────────────────
+// ── 分析加载（带缓存 + 流式状态感知）────────────────────────────────────────
 
-async function loadAnalysis(section) {
+function loadAnalysis(section) {
   if (!currentData) return;
 
-  // 命中缓存：直接展示，不发请求
+  // 1. 已完成：直接从缓存渲染
   if (analysisCache[section] !== undefined) {
-    showCachedAnalysis(analysisCache[section]);
+    renderContent(section, analysisCache[section], false);
     return;
   }
 
-  showLoading();
+  // 2. 正在流式加载：显示已积累的部分内容 + 光标
+  if (pendingStreams[section]) {
+    const textEl = document.getElementById('analysis-text');
+    document.getElementById('analysis-loading').style.display = 'none';
+    document.getElementById('analysis-placeholder').style.display = 'none';
+    const partial = sectionTexts[section] || '';
+    textEl.innerHTML = isClaudeMode ? marked.parse(partial) : partial;
+    textEl.style.display = 'block';
+    textEl.classList.add('typing-cursor');
+    return;
+  }
 
+  // 3. 尚未加载：发起请求
+  showLoading();
   if (isClaudeMode) {
     initChat(currentData);
-    await loadClaudeAnalysis(section);
+    loadClaudeAnalysis(section); // 不 await，后台运行
   } else {
-    await loadRulesAnalysis(section);
+    loadRulesAnalysis(section);
   }
 }
 
-function showCachedAnalysis(text) {
-  document.getElementById('analysis-placeholder').style.display = 'none';
-  document.getElementById('analysis-loading').style.display = 'none';
-  const textEl = document.getElementById('analysis-text');
-  if (isClaudeMode) {
-    textEl.innerHTML = marked.parse(text);
-  } else {
-    textEl.textContent = text;
-  }
-  textEl.style.display = 'block';
-}
+// ── 规则引擎加载 ──────────────────────────────────────────────────────────────
 
 async function loadRulesAnalysis(section) {
   try {
@@ -145,33 +155,38 @@ async function loadRulesAnalysis(section) {
         wuxing_analysis: currentData.wuxing,
         dayun_data: currentData.dayun,
         mode: 'rules',
-        section: section
+        section
       })
     });
 
     const result = await response.json();
     if (result.success) {
-      analysisCache[section] = result.text; // 写入缓存
-      showAnalysisText(result.text);
+      analysisCache[section] = result.text;
+      if (currentSection === section) renderContent(section, result.text, false);
     } else {
-      showError('分析失败');
+      if (currentSection === section) showError('分析失败');
     }
   } catch (err) {
-    showError('错误：' + err.message);
+    if (currentSection === section) showError('错误：' + err.message);
   }
 }
 
-async function loadClaudeAnalysis(section) {
-  // 取消上一个正在进行的流式请求
-  if (streamController) {
-    streamController.abort();
-  }
-  streamController = new AbortController();
-  const signal = streamController.signal;
+// ── Claude 流式加载（后台运行，不阻塞 Tab 切换）──────────────────────────────
 
-  showAnalysisText('', true); // 先清空，准备流式填充
-  const textEl = document.getElementById('analysis-text');
-  textEl.classList.add('typing-cursor');
+async function loadClaudeAnalysis(section) {
+  const controller = new AbortController();
+  pendingStreams[section] = controller;
+  sectionTexts[section] = '';
+
+  // 如果当前正在看这个 Tab，切换到流式展示状态
+  if (currentSection === section) {
+    const textEl = document.getElementById('analysis-text');
+    document.getElementById('analysis-loading').style.display = 'none';
+    document.getElementById('analysis-placeholder').style.display = 'none';
+    textEl.textContent = '';
+    textEl.style.display = 'block';
+    textEl.classList.add('typing-cursor');
+  }
 
   try {
     const response = await fetch('/api/analysis', {
@@ -182,9 +197,9 @@ async function loadClaudeAnalysis(section) {
         wuxing_analysis: currentData.wuxing,
         dayun_data: currentData.dayun,
         mode: 'claude',
-        section: section
+        section
       }),
-      signal
+      signal: controller.signal
     });
 
     const reader = response.body.getReader();
@@ -192,7 +207,7 @@ async function loadClaudeAnalysis(section) {
     let buffer = '';
     let fullText = '';
 
-    while (true) {
+    outer: while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -201,30 +216,43 @@ async function loadClaudeAnalysis(section) {
       buffer = lines.pop();
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          if (data === '[DONE]') {
-            textEl.classList.remove('typing-cursor');
-            analysisCache[section] = fullText; // 流结束后写入缓存
-            break;
+        if (controller.signal.aborted) break outer;
+        if (!line.startsWith('data: ')) continue;
+
+        const data = line.slice(6);
+
+        if (data === '[DONE]') {
+          // 流结束：写入缓存，更新 DOM（如果用户当前在此 Tab）
+          analysisCache[section] = fullText;
+          delete pendingStreams[section];
+          delete sectionTexts[section];
+          if (currentSection === section) {
+            renderContent(section, fullText, false);
           }
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.text) {
-              fullText += parsed.text;
-              textEl.innerHTML = marked.parse(fullText);
-            }
-            if (parsed.error) {
-              showError(parsed.error);
-            }
-          } catch (e) {}
+          break outer;
         }
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.text) {
+            fullText += parsed.text;
+            sectionTexts[section] = fullText;
+            // 只在用户当前查看此 Tab 时更新 DOM
+            if (currentSection === section) {
+              document.getElementById('analysis-text').innerHTML = marked.parse(fullText);
+            }
+          }
+          if (parsed.error && currentSection === section) {
+            showError(parsed.error);
+          }
+        } catch (e) {}
       }
     }
   } catch (err) {
-    textEl.classList.remove('typing-cursor');
-    // AbortError 是主动取消，不属于错误，静默处理
-    if (err.name !== 'AbortError') {
+    delete pendingStreams[section];
+    delete sectionTexts[section];
+    if (err.name !== 'AbortError' && currentSection === section) {
+      document.getElementById('analysis-text').classList.remove('typing-cursor');
       showError('流式传输错误：' + err.message);
     }
   }
@@ -232,21 +260,23 @@ async function loadClaudeAnalysis(section) {
 
 // ── UI 工具函数 ───────────────────────────────────────────────────────────────
 
+function renderContent(section, text, streaming) {
+  const textEl = document.getElementById('analysis-text');
+  document.getElementById('analysis-placeholder').style.display = 'none';
+  document.getElementById('analysis-loading').style.display = 'none';
+  textEl.classList.remove('typing-cursor');
+  if (isClaudeMode) {
+    textEl.innerHTML = marked.parse(text);
+  } else {
+    textEl.textContent = text;
+  }
+  textEl.style.display = 'block';
+}
+
 function showLoading() {
   document.getElementById('analysis-placeholder').style.display = 'none';
   document.getElementById('analysis-text').style.display = 'none';
   document.getElementById('analysis-loading').style.display = 'block';
-}
-
-function showAnalysisText(text, streaming = false) {
-  document.getElementById('analysis-placeholder').style.display = 'none';
-  document.getElementById('analysis-loading').style.display = 'none';
-  const textEl = document.getElementById('analysis-text');
-  textEl.textContent = text;
-  textEl.style.display = 'block';
-  if (!streaming) {
-    textEl.classList.add('fade-in');
-  }
 }
 
 function showError(msg) {
